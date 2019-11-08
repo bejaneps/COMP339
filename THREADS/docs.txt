@@ -1,0 +1,89 @@
+Threads are lightweight processes.
+
+There are four primary benefits to multithreading:
+	1. Programming abstraction (diving work for threads)
+	2. Improving responsiveness (I/O)
+	3. Context switching (from thread to thread, not to process)
+	4. Memory savings (memory is shared)
+
+* Failing to synchronize threads can lead to corrupt output, incorrect execution, and program crash.
+
+* The first and most important step in building a threaded application is deciding on a
+threading pattern.
+
+Thread-per-Connection (run until completion):
+	is a programming pattern in which a unit of work is assigned to
+	one thread, and that thread is assigned at most one unit of work, for the duration of the
+	unit of work’s execution. The unit of work is however you break down your application’s
+	work: a request, a connection, etc. A thread grabs a con‐ nection or a request and processes it until done.
+
+Event-Driven Threading:
+	consider the web server.
+
+* Concurrency is the ability of two or more threads to execute in overlapping time periods.
+* Parallelism is the ability to execute two or more threads simultaneously.
+* Concurrency is a programming pattern, a way of approaching problems. Parallelism is a hardware feature, achievable through concurrency.
+
+-------------------------------------------------------------------------------------------------------------------
+
+The Pthread API is defined in <pthread.h> . Every function in the API is prefixed by
+pthread_ .
+
+Although Pthreads is provided by glibc, it is in a separate library, libpthread, and thus requires explicit linkage. With gcc, this is automated by the -pthread flag, which ensures the proper library is linked into your executable:
+
+ $ gcc -Wall -Werror -pthread beard.c -o beard
+
+* When your program is first run and executes the main() function, it is single threaded.From this initial thread, sometimes called the default or master thread, you must create one or more additional threads to become multithreaded.
+
+	#include <pthread.h>
+
+	int pthread_create (pthread_t *thread,
+						const pthread_attr_t *attr, 
+						void *(*start_routine) (void *), 
+						void *arg);
+
+* The start_routine must have the following signature:
+	void * start_thread (void *arg);
+
+* Upon successful invocation, a new thread is created and begins executing the function provided by start_routine , passed the sole argument arg . The function will store the thread ID, used to represent the new thread, in the pthread_t pointed at by thread , if it is not NULL.
+
+* The pthread_attr_t object pointed at by attr is used to change the default thread attributes of the newly created thread (mostly NULL). Thread attributes let programs change many aspects of threads, such as their stack size, schedulizing parameters, and initial detached state.
+
+* Example:
+	pthread_t thread;
+	int ret;
+
+	ret = pthread_create (&thread, NULL, start_routine, NULL);
+	if (!ret) {
+		errno = ret;
+		perror("pthread_create");
+		return -1;
+	}
+
+* A thread can obtain its TID at runtime via the pthread_self() function:
+	#include <pthread.h>
+
+	pthread_t pthread_self (void);
+
+* To compare thread IDs, the Pthread library needs to provide a special interface:
+	#include <pthread.h>
+
+	int pthread_equal (pthread_t t1, pthread_t t2);
+
+* Thread termination is similar to process termination, except that when a thread terminates, the rest of the threads in the process continue executing.
+
+* The easiest way for a thread to terminate itself is to call pthread_exit function. Upon invocation, the calling thread is terminated. retval is provided to any thread waiting on the terminating thread’s death
+	#include <pthread.h>
+
+	void pthread_exit (void *retval);
+
+* In order to cancel or terminate other thread, one should use pthread_cancel function.
+	#include <pthread.h>
+
+	int pthread_cancel (pthread_t thread);
+
+------------------------------------------------------------------------------------------------------------------
+* Given that threads can be easily created and destroyed, there must be some way to synchronize threads against the termination of other threads—the threading equivalent of wait(). Joining allows one thread to block while waiting for the termination of another:
+	#include <pthread.h>
+	
+	int pthread_join (pthread_t thread, void **retval);

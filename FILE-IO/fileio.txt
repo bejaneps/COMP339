@@ -1,0 +1,217 @@
+* size_t = unsigned int		// ""
+* ssize_t = signed int		// size of bytes read
+* off_t = long or long long int		// position of file after lseek or same system calls
+
+---------------------------------------------------------------------------------------------------------------------------------
+#include <sys/types.h>		// open(), creat(), lseek(), ftruncate(), truncate()
+#include <sys/stat.h>		// open(), creat()
+#include <fcntl.h>			// open(), creat()
+#include <unistd.h>			// read(), write(), lseek(), close(), pread(), pwrite(), fsync(), fdatasync(), sync(), syncfs(), ftruncate(), truncate()
+#include <stdlib.h>			// malloc(), calloc(), realloc(), exit()
+#include <stdio.h>			// printf() family, perror()
+#include <errno.h>			// errno variable
+#include <string.h>			// string manipulation(strlen, strcate), strerror()
+
+---------------------------------------------------------------------------------------------------------------------------------
+
+open()
+
+A file is opened and a file descriptor is obtained with the open() system call:
+	#include <sys/types.h>
+	#include <sys/stat.h>
+	#include <fcntl.h>
+
+	int open (const char *name, int flags);
+	int open (const char *name, int flags, mode_t mode);
+
+! The flags argument is the bitwise-OR of one or more flags. It must contain an access mode, which is one of O_RDONLY, O_WRONLY, or O_RDWR.
+
+! More flags: 
+
+	1. O_APPEND: before each write, the file position will be updated to point to the end of the file. This occurs even if another process has written to the file after the issuing process’s last write, thereby changing the file position.
+
+	2. O_ASYNC: a signal (SIGIO by default) will be generated when the specified file becomes readable or writable. This flag is available only for FIFOs, pipes, sockets, and terminals, not for regular files.
+
+	3. O_CLOEXEC: Sets the close-on-exec flag on the opened file. Upon executing a new process, the file will automatically be closed. This obviates needing to call fcntl() to set the flag and eliminates a race condition.
+
+	4. O_CREAT: If the file denoted by name does not exist, the kernel will create it. If the file already exists, this flag has no effect unless O_EXCL is also given
+
+	5. O_DIRECT: The file will be opened for direct I/O.
+
+	6. O_DIRECTORY: If name is not a directory, the call to open() will fail. This flag is used internally by the opendir() library call.
+
+	7. O_EXCL: When given with O_CREAT, this flag will cause the call to open() to fail if the file given by name already exists. This is used to prevent race conditions on file creation. If O_CREAT is not also provided, this flag has no meaning.
+
+	8. O_LARGEFILE: The given file will be opened using 64-bit offsets, allowing the manipulation of files larger than two gigabytes. This is implied on 64-bit architectures.
+
+	9. O_NOATIME+: The given file’s last access time is not updated upon read. This flag is useful for backup, indexing, and similar programs that read every file on a system, to prevent significant write activity resulting from updating the inodes of each read file. 
+
+	10. O_NOCTTY: If the given name refers to a terminal device (say, /dev/tty), it will not become the process’s controlling terminal, even if the process does not currently have a controlling terminal.
+
+	11. O_NOFOLLOW: If name is a symbolic link, the call to open() will fail. Normally,the link is resolved, and the target file is opened. If other components in the given path are links, the call will still succeed. For example, if name is /etc/ship/plank.txt, the call will fail if plank.txt is a symbolic link. It will succeed, however, if etc or ship is a symbolic link, so long as plank.txt is not.
+
+	12. O_NONBLOCK: If possible, the file will be opened in nonblocking mode. Neither the open() call, nor any other operation will cause the process to block (sleep) on the I/O. This behavior may be defined only for FIFOs.
+
+	13. O_SYNC: The file will be opened for synchronous I/O. No write operation will complete until the data has been physically written to disk; normal read operations are already synchronous, so this flag has no effect on reads. POSIX additionally defines O_DSYNC and O_RSYNC; on Linux, these flags are synonymous with O_SYNC
+
+	14. O_TRUNC: If the file exists, it is a regular file, and the given flags allow for writing, the file will be truncated to zero length. Use of O_TRUNC on a FIFO or terminal device is ignored. Use on other file types is undefined. Specifying O_TRUNC with O_RDONLY is also undefined, as you need write access to the file in order to truncate it.
+
+! Modes for creating a file:
+	S_IRWXU
+		Owner has read, write, and execute permission.
+	S_IRUSR
+		Owner has read permission.
+	S_IWUSR
+		Owner has write permission.
+	S_IXUSR
+		Owner has execute permission.
+	S_IRWXG
+		Group has read, write, and execute permission.
+	S_IRGRP
+		Group has read permission.
+	S_IWGRP
+		Group has write permission.
+	S_IXGRP
+		Group has execute permission.
+	S_IRWXO
+		Everyone else has read, write, and execute permission.
+	S_IROTH
+		Everyone else has read permission.
+	S_IWOTH
+		Everyone else has write permission.
+	S_IXOTH
+		Everyone else has execute permission.
+
+! The O_SYNC flag may be passed to open(), indicating that all I/O on the file should be synchronized.
+
+creat()
+
+The combination of O_WRONLY | O_CREAT | O_TRUNC is so common that a system call
+exists to provide just that behavior:
+
+	#include <sys/types.h>
+	#include <sys/stat.h>
+	#include <fcntl.h>
+
+	int creat ( const char * name, mode_t mode);
+
+! Both open() and creat() return a file descriptor on success. On error, both return −1, and set errno to an appropriate error value
+
+read()
+
+Each call reads up to len bytes into the memory pointed at by buf from the current file
+offset of the file referenced by fd. On success, the number of bytes written into buf is returned. On error, the call returns −1 and sets errno. The file position is advanced by the number of bytes read from fd. If the object represented by fd is not capable of seeking (for example, a character device file), the read always occurs from the “current” position.
+
+	#include <unistd.h>
+
+	ssize_t read ( int fd, void * buf, size_t len);
+
+! The number of bytes read is equal to the size of the unsigned long type.
+
+write()
+
+A call to write() writes up to count bytes starting at buf to the current position of the file referenced by the file descriptor fd. Files backed by objects that do not support seeking (for example, character devices) always write starting at the “head.”
+
+	#include <unistd.h>
+
+	ssize_t write ( int fd, const void * buf, size_t count);
+
+fsync() & fdatasync()
+
+The fsync() function is intended to force a physical write of data from the buffer cache, and to assure that after a system crash or other failure that all data up to the time of the fsync() call is recorded on the disk.”. [Note: The difference between fsync() and fdatasync() is that the later does not necessarily update the meta-data associated with a file – such as the “last modified” date – but only the file data.]
+
+!!! Calling fsync() does not necessarily ensure that the entry in the directory containing the file has also reached disk.  For that an explicit fsync() on a file descriptor for the directory is also needed.
+
+! On success, these system calls return zero.  On error, -1 is returned, and  errno  is setappropriately.
+
+	#include <unistd.h>
+	
+	int fsync ( int fd);
+	int fdatasync ( int fd);
+
+sync() & syncfs()
+
+Causes all pending modifications to filesystem metadata and cached file data to be
+written to the underlying filesystems.
+
+! syncfs() is like sync(), but synchronizes just the filesystem containing file referred to by the open file descriptor fd.
+
+	#include <unistd.h>
+
+	void sync(void);
+	int syncfs(int fd);
+
+close()
+
+A call to close() unmaps the open file descriptor fd and disassociates the file from the process. The given file descriptor is then no longer valid, and the kernel is free to reuse it as the return value to a subsequent open() or creat() call. A call to close() returns 0 on success. On error, it returns −1 and sets errno appropriately.
+
+	#include <unistd.h>
+
+	int close ( int fd);
+
+lseek()
+
+The lseek() system call is provided to set the file position of a file descriptor to a given value. Other than updating the file position, it performs no other action, and initiates no I/O whatsoever
+
+	#include <sys/types.h>
+	#include <unistd.h>
+
+	off_t lseek ( int fd, off_t pos, int origin);
+
+! The behavior of lseek() depends on the origin argument, which can be one of the
+following:
+
+	SEEK_CUR
+		The current file position of fd is set to its current value plus pos, which can be negative, zero, or positive. A pos of zero returns the current file position value.
+	SEEK_END
+		The current file position of fd is set to the current length of the file plus pos, which can be negative, zero, or positive. A pos of zero sets the offset to the end of the file.
+	SEEK_SET
+		The current file position of fd is set to pos. A pos of zero sets the offset to the beginning of the file.
+
+! The call returns the new file position on success. On error, it returns −1 and errno is set as appropriate.
+
+
+!!! On its own, seeking past the end of a file does nothing—a read request to the newly
+created file position will return EOF. If a write request is subsequently made to this
+position, however, new space will be created between the old length of the file and the
+new length, and it will be padded with zeros.
+
+!!! This zero padding is called a hole. On Unix-style filesystems, holes do not occupy any
+physical disk space. This implies that the total size of all files on a filesystem can add up to more than the physical size of the disk. Files with holes are called sparse files. Sparse files can save considerable space and enhance performance because manipulating the holes does not initiate any physical I/O. 
+
+!!! A read request to the part of a file in a hole will return the appropriate number of zeros.
+
+pread() & pwrite()
+
+This call reads up to count bytes into buf from the file descriptor fd at file position pos.
+
+	#define _XOPEN_SOURCE 500
+
+	#include <unistd.h>
+
+	ssize_t pread ( int fd, void * buf, size_t count, off_t pos);
+
+This call writes up to count bytes from buf to the file descriptor fd at file position pos.
+
+	#define _XOPEN_SOURCE 500
+
+	#include <unistd.h>
+
+	ssize_t pwrite ( int fd, const void * buf, size_t count, off_t pos);
+
+!!! Upon completion, they do not update the file position.
+
+! On success, both calls return the number of bytes read or written. A return value of 0 from pread() indicates EOF; from pwrite(), a return value of 0 indicates that the call did not write anything. On error, both calls return −1 and set errno appropriately. For pread(), any valid read() or lseek() errno value is possible. For pwrite(), any valid write() or lseek() value is possible.
+
+ftruncate() & truncate()
+
+Both system calls truncate the given file to the length given by len.
+
+	#include <unistd.h>
+	#include <sys/types.h>
+
+	int ftruncate (int fd, off_t len);
+	int truncate (const char *path, off_t len);
+
+! The ftruncate() system call operates on the file descriptor given by fd, which must be open for writing.
+The truncate() system call operates on the filename given by path, which must be writable. Both return 0 on success. On error, they return −1 and set errno as appropriate.
